@@ -1,27 +1,19 @@
-bits 32                         ; We are working in 32-bit protected mode
-section .multiboot              ; Special section for the bootloader signature
-    ALIGN 4
-    MAGIC    equ 0x1BADB002     ; Magic number letting GRUB find our kernel
-    FLAGS    equ 0x00           ; Flags
-    CHECKSUM equ -(MAGIC + FLAGS)
+# Target binary name
+KERNEL = mykernel.bin
 
-    dd MAGIC
-    dd FLAGS
-    dd CHECKSUM
+all: $(KERNEL)
 
-section .text
-global start
-extern kernel_main              ; Links to the main function in kernel.c
+$(KERNEL): boot.o kernel.o
+	ld -m elf_i386 -T linker.ld boot.o kernel.o -o $(KERNEL)
 
-start:
-    cli                         ; Disable hardware interrupts
-    mov esp, stack_space        ; Point the CPU stack pointer to our memory area
-    call kernel_main            ; Jump into our C kernel code
-    
-halt:
-    hlt                         ; If kernel_main returns, halt the CPU
-    jmp halt
+boot.o: boot.asm
+	nasm -f elf32 boot.asm -o boot.o
 
-section .bss
-resb 8192                       ; Reserve 8 Kilobytes of memory for the stack
-stack_space:
+kernel.o: kernel.c
+	gcc -m32 -c kernel.c -o kernel.o -ffreestanding -O2 -Wall -Wextra
+
+run: $(KERNEL)
+	qemu-system-i386 -kernel $(KERNEL)
+
+clean:
+	rm -f *.o $(KERNEL)
