@@ -8,7 +8,7 @@ SECTIONS {
         *(.text)                /* Followed by the actual code */
     }
 
-    .rodata : { *(.rodata) }    /* Read-only data (like text strings) */
+    .rodata : { *(.rodata) }    /* Read-only data */
     .data   : { *(.data) }      /* Initialized variables */
     .bss    : { *(.bss) }       /* Uninitialized variables & our stack */
 }
