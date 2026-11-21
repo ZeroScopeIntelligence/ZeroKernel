@@ -1,196 +1,175 @@
 # Zero Kernel
 
-A minimal x86 operating system kernel written in C that runs directly on bare metal.
+Zero Kernel is an experimental, standalone x86 operating-system project developed in C and Assembly. The goal is to build the kernel and its supporting operating-system components from the ground up, beginning with a bootable kernel and growing toward a filesystem, shell, and native software package manager.
 
-Zero Kernel provides a lightweight command-line interface, direct VGA text output, keyboard input handling, and simple in-memory file storage without relying on any existing operating system.
+**Target architecture:** x86_64  
+**Bootloader:** GRUB / Multiboot2 (planned development path)  
+**Languages:** C and x86 Assembly  
+**Development/testing:** QEMU  
+**Status:** Educational project under active development
 
----
-
-## Features
-
-* 🖥️ VGA text mode terminal
-* ⌨️ PS/2 keyboard input
-* 💻 Interactive command shell
-* 📄 Virtual RAM-based file storage
-* 🧹 Screen clearing
-* 🔊 Echo command
-* 📚 Built-in help menu
-* ⚡ Direct hardware I/O using inline assembly
-* 🔌 ACPI/QEMU shutdown support
-* 🛠️ Simple installation simulation
+> **Project status:** This README distinguishes existing project features from proposed work. Items in the roadmap and design documents are not claims that those features are already implemented.
 
 ---
 
-## Current Commands
+## Current project features
 
-| Command        | Description                       |
-| -------------- | --------------------------------- |
-| `help`         | Display available commands        |
-| `about`        | Show operating system information |
-| `clear`        | Clear the display                 |
-| `echo <text>`  | Print text back to the terminal   |
-| `write <text>` | Save text into virtual RAM        |
-| `read`         | Display saved RAM contents        |
-| `version`      | Display system version            |
-| `show version` | Display system version            |
-| `install`      | Simulate installation process     |
-| `shutdown`     | Power off the virtual machine     |
+The repository's initial implementation documents the following capabilities:
 
----
+- VGA text-mode terminal output
+- PS/2 keyboard input
+- Interactive command shell
+- In-memory, RAM-based text storage
+- Built-in `help`, `about`, `clear`, `echo`, `write`, `read`, and `version` commands
+- QEMU/ACPI shutdown support
+- Basic installation simulation
+- Direct hardware I/O using inline assembly
 
-## Example
+The current RAM-based storage is temporary: its contents do not persist after the virtual machine shuts down. It is not yet a disk-backed filesystem.
+
+## Project direction
+
+Zero Kernel is intended to become an independent operating system, not a Linux distribution or a modified Linux kernel. Linux-like command names and directory conventions may be familiar to users, but kernel services, filesystem code, executable support, and package management will be developed as Zero Kernel components.
+
+## Planned architecture
 
 ```text
-==================================================
-          Welcome to Zero OS v1.0
-==================================================
+                  Zero Shell / Applications
+                            |
+                            v
+                    Virtual Filesystem
+                       /         \
+                      v           v
+                   ZeroFS       ext2*
+                      \           /
+                       v         v
+                    Block-device layer
+                            |
+                       Storage driver
 
-Type 'help' to see available system tools.
-
-zero_kernel> help
-
-Available commands:
-help
-about
-clear
-echo
-write
-read
-shutdown
-show version
-install
+                  ZeroPKG (future)
+                         |
+                 Package repositories
 ```
 
----
+`* ext2 compatibility is a future goal, after native ZeroFS functionality is established.`
 
-## Project Structure
+## Filesystem: ZeroFS
+
+ZeroFS is the proposed native filesystem for Zero Kernel. The planned design includes:
+
+- A versioned superblock
+- Block allocation bitmap
+- Inode table and directory entries
+- File data blocks
+- A Virtual Filesystem (VFS) interface
+- A host-side utility for creating and inspecting disk images
+
+The intended root filesystem layout follows familiar Unix conventions:
 
 ```text
-Zero-Kernel/
-│
-├── kernel.c
-├── linker.ld
-├── boot.asm
-├── Makefile
-├── README.md
+/
+├── bin/
+├── boot/
+├── dev/
+├── etc/
+├── home/
+├── lib/
+├── opt/
+├── root/
+├── tmp/
+├── usr/
+└── var/
 ```
 
----
+The first storage target is a disposable QEMU virtual disk. ext2 compatibility may be added later. ext4 is outside the initial implementation scope.
 
-## How It Works
+See [Filesystem Design](docs/FILESYSTEM.md) for the proposed on-disk structures, VFS responsibilities, and implementation milestones.
 
-### Keyboard Driver
+## Software installation: ZeroPKG
 
-Keyboard input is read directly from the PS/2 controller.
+ZeroPKG is the proposed native package manager. Its intended command interface is:
 
-```c
-inb(0x60)
-```
+| Command | Purpose |
+|---|---|
+| `zeropkg update` | Refresh repository metadata |
+| `zeropkg upgrade` | Upgrade installed packages |
+| `zeropkg install <name>` | Install a package |
+| `zeropkg remove <name>` | Remove a package |
+| `zeropkg search <term>` | Search packages |
+| `zeropkg list` | List installed packages |
+| `zeropkg info <name>` | Show package information |
 
-Scancodes are translated into ASCII characters using a lookup table.
+These commands are a design target, not currently working shell commands. The proposed `.zpkg` format will include package metadata, a file manifest, and payload files. Package integrity and repository authenticity checks are required before installation is enabled.
 
----
+A full package manager depends on persistent storage, a VFS, an ELF64 loader, user-mode execution, process management, and system calls. Remote repositories will additionally require networking and TLS.
 
-### VGA Output
+See [ZeroPKG Design](docs/ZEROPKG.md) for the proposed package format, trust model, and implementation milestones.
 
-Characters are written directly into VGA text memory.
+## Planned shell commands
 
-```c
-0xB8000
-```
+The shell is expected to grow toward familiar filesystem utilities:
 
-Every character contains:
+- `help`, `clear`, `echo`, `about`, `version`
+- `ls`, `cd`, `pwd`
+- `mkdir`, `touch`, `cat`
+- `cp`, `mv`, `rm`
+- `zeropkg` package-management commands
 
-* ASCII value
-* Text color
+Filesystem and package commands will become available only after their underlying kernel services are implemented.
 
----
+## Development roadmap
 
-### Command Interpreter
+1. Stabilize the boot process and kernel entry.
+2. Establish x86_64 long mode and CPU tables.
+3. Implement interrupts, exceptions, and memory management.
+4. Build terminal and keyboard input services.
+5. Design and implement the VFS and native ZeroFS.
+6. Add a block-device abstraction and QEMU storage driver.
+7. Connect filesystem operations to the shell.
+8. Implement an ELF64 loader, user mode, processes, and system calls.
+9. Build ZeroPKG and local package installation.
+10. Add package repositories, signature verification, and network support.
+11. Evaluate ext2 compatibility and additional device drivers.
 
-User input is buffered until Enter is pressed.
+## Development principles
 
-The kernel compares the command against supported commands using its own implementations of:
-
-* `strcmp()`
-* `strncmp()`
-
-No C standard library is required.
-
----
-
-### Virtual File Storage
-
-The `write` command stores text inside a RAM buffer.
-
-```text
-write Hello World
-```
-
-Later it can be retrieved using
-
-```text
-read
-```
-
-This acts as a simple in-memory virtual file system.
-
----
+- Build and test in QEMU before experimenting with physical hardware.
+- Keep kernel code freestanding and independent of a host operating system at runtime.
+- Separate bootstrapping, kernel services, drivers, filesystem code, and user applications.
+- Test filesystem code against disposable virtual disk images.
+- Verify package metadata, hashes, and signatures before installing software.
+- Document which features are implemented, experimental, or planned.
 
 ## Requirements
 
-* x86 Emulator
+The intended development toolchain includes:
 
-  * QEMU (recommended)
-  * Bochs
-  * VirtualBox (with appropriate boot image)
+- GCC or an x86_64 cross-compiler
+- NASM
+- GNU binutils and linker
+- GNU Make
+- GRUB utilities and `grub-mkrescue`
+- xorriso
+- QEMU system emulator
+- GDB (for debugging)
 
-* GCC Cross Compiler
+Exact build dependencies and commands will be maintained as the build system is finalized.
 
-* NASM
+## Educational use
 
-* GNU Make
+Zero Kernel is an experimental learning project for exploring:
 
----
+- Operating-system architecture
+- x86_64 assembly and C
+- Bootloaders and CPU initialization
+- Memory management
+- Hardware drivers
+- Filesystem design
+- Executable formats and process management
+- Package management
 
-## Future Goals
-
-* Memory manager
-* Interrupt Descriptor Table (IDT)
-* Paging
-* Dynamic heap allocation
-* FAT12/FAT32 filesystem
-* Disk driver
-* Process scheduler
-* User mode applications
-* ELF executable loader
-* Networking
-* PCI device support
-* Mouse driver
-* Real filesystem
-* Graphical desktop
-
----
-
-## Why Zero Kernel?
-
-Zero Kernel is a learning operating system project built from scratch to explore low-level programming concepts including:
-
-* Operating system development
-* Computer architecture
-* Bare-metal programming
-* Hardware communication
-* Memory management
-* Shell design
-* Kernel development
-
----
-
-## Disclaimer
-
-This project is intended for educational purposes. It is an experimental hobby operating system and is not designed for production use.
-
----
+It is not intended for production use.
 
 ## License
 
@@ -198,4 +177,4 @@ MIT License
 
 ---
 
-Built with C, Assembly, and curiosity.
+Built by **ZeroScope Intelligence** with C, Assembly, and curiosity.
