@@ -1,31 +1,120 @@
 # Zero Kernel
 
-Zero Kernel is an experimental, standalone x86 operating-system project developed in C and Assembly. The goal is to build the kernel and its supporting operating-system components from the ground up, beginning with a bootable kernel and growing toward a filesystem, shell, and native software package manager.
+Zero Kernel is an experimental, standalone operating-system kernel project developed in C and x86 Assembly under **ZeroScope Intelligence**. The project is being built from the ground up, beginning with a bootable x86_64 kernel and progressing toward memory management, hardware drivers, a filesystem, shell, and native package manager.
 
 **Target architecture:** x86_64  
-**Bootloader:** GRUB / Multiboot2 (planned development path)  
-**Languages:** C and x86 Assembly  
-**Development/testing:** QEMU  
-**Status:** Educational project under active development
+**Bootloader:** GRUB / Multiboot2  
+**Languages:** C and x86 Assembly (NASM)  
+**Build environment:** Debian Trixie container and x86_64-elf cross-compiler  
+**Emulator:** QEMU  
+**Current milestone:** First successful x86_64 QEMU boot
 
-> **Project status:** This README distinguishes existing project features from proposed work. Items in the roadmap and design documents are not claims that those features are already implemented.
+> **Project status:** The x86_64 bootstrap described below has been built, validated as Multiboot2, and successfully booted in QEMU. Roadmap items and design documents are proposals unless explicitly marked implemented.
 
 ---
 
-## Current project features
+## Current milestone: x86_64 bootstrap
 
-The repository's initial implementation documents the following capabilities:
+The new bootstrap provides the first working foundation for the x86_64 kernel:
 
-- VGA text-mode terminal output
-- PS/2 keyboard input
-- Interactive command shell
-- In-memory, RAM-based text storage
-- Built-in `help`, `about`, `clear`, `echo`, `write`, `read`, and `version` commands
-- QEMU/ACPI shutdown support
-- Basic installation simulation
-- Direct hardware I/O using inline assembly
+- GRUB Multiboot2 header and boot configuration.
+- Assembly entry point and initial page-table setup.
+- Transition from the 32-bit bootloader environment into x86_64 long mode.
+- Initial GDT and 16 KiB bootstrap stack.
+- Freestanding C kernel entry point.
+- VGA text-mode output at `0xB8000`.
+- QEMU bootable ISO generation.
 
-The current RAM-based storage is temporary: its contents do not persist after the virtual machine shuts down. It is not yet a disk-backed filesystem.
+The first successful boot displayed the Zero Kernel title, architecture and language information, and kernel initialization messages.
+
+### Boot screen
+
+The initial kernel screen confirms that execution reached `kernel_main()` and wrote text to VGA memory. It is an early boot milestone, not a complete operating system.
+
+## Repository layout
+
+```text
+.
+├── boot/
+│   └── grub/
+│       └── grub.cfg
+├── docker/
+│   └── Dockerfile
+├── docs/
+│   ├── BOOTSTRAP.md
+│   ├── FILESYSTEM.md
+│   └── ZEROPKG.md
+├── kernel/
+│   ├── arch/
+│   │   └── x86_64/
+│   │       └── boot.asm
+│   ├── core/
+│   │   └── kernel.c
+│   ├── boot.asm
+│   ├── kernel.c
+│   ├── linker.ld
+│   └── Makefile
+├── linker.ld
+└── Makefile
+```
+
+The root-level Makefile builds the new x86_64 bootstrap from `kernel/arch/x86_64/boot.asm` and `kernel/core/kernel.c`. Earlier prototype files are retained under `kernel/` and are not part of this new build target.
+
+## Build and run
+
+The recommended build environment is the included Debian Trixie Docker image. See [Bootstrap Build Guide](docs/BOOTSTRAP.md) for the full cross-compiler setup and build instructions.
+
+Build the container from the repository root:
+
+```bash
+docker build -t zerokernel-builder -f docker/Dockerfile .
+```
+
+Start the container with the repository mounted:
+
+```bash
+docker run --rm -it -v "$PWD:/workspace" zerokernel-builder
+```
+
+After building and installing the `x86_64-elf` cross-compiler into `.toolchain`, run these commands from the repository root:
+
+```bash
+make
+make check
+make iso
+```
+
+Boot the ISO in QEMU:
+
+```bash
+make run
+```
+
+For terminal-only environments with QEMU's curses display backend:
+
+```bash
+qemu-system-x86_64 \
+    -cdrom build/zerokernel.iso \
+    -m 256M \
+    -display curses \
+    -monitor none
+```
+
+The build output is stored in `build/`; the local cross-compiler is stored in `.toolchain/`. Both are excluded from Git.
+
+## Current limitations
+
+- Initial page tables map only the first 2 MiB of physical memory.
+- VGA text output is implemented; serial logging is not yet implemented.
+- IDT, exception handling, and hardware interrupt handling are not yet implemented.
+- Physical and virtual memory managers are not yet implemented.
+- Keyboard and storage drivers are future work for the new x86_64 bootstrap.
+- The Multiboot2 information structure is passed to the C entry point but is not yet parsed.
+- The older prototype source is retained for reference and is separate from the new root-level build.
+
+## Earlier prototype
+
+The repository retains an earlier kernel prototype under `kernel/kernel.c`, `kernel/boot.asm`, `kernel/linker.ld`, and `kernel/Makefile`. That prototype explored VGA output, PS/2 keyboard input, a command loop, and temporary in-memory text storage. It is kept separate from the new x86_64 bootstrap while the architecture is being rebuilt and validated.
 
 ## Project direction
 
@@ -106,23 +195,11 @@ A full package manager depends on persistent storage, a VFS, an ELF64 loader, us
 
 See [ZeroPKG Design](docs/ZEROPKG.md) for the proposed package format, trust model, and implementation milestones.
 
-## Planned shell commands
-
-The shell is expected to grow toward familiar filesystem utilities:
-
-- `help`, `clear`, `echo`, `about`, `version`
-- `ls`, `cd`, `pwd`
-- `mkdir`, `touch`, `cat`
-- `cp`, `mv`, `rm`
-- `zeropkg` package-management commands
-
-Filesystem and package commands will become available only after their underlying kernel services are implemented.
-
 ## Development roadmap
 
-1. Stabilize the boot process and kernel entry.
-2. Establish x86_64 long mode and CPU tables.
-3. Implement interrupts, exceptions, and memory management.
+1. Expand boot-time memory mapping and formalize CPU initialization.
+2. Add serial logging, GDT/IDT setup, and CPU exception handlers.
+3. Implement physical memory management.
 4. Build terminal and keyboard input services.
 5. Design and implement the VFS and native ZeroFS.
 6. Add a block-device abstraction and QEMU storage driver.
@@ -141,33 +218,9 @@ Filesystem and package commands will become available only after their underlyin
 - Verify package metadata, hashes, and signatures before installing software.
 - Document which features are implemented, experimental, or planned.
 
-## Requirements
-
-The intended development toolchain includes:
-
-- GCC or an x86_64 cross-compiler
-- NASM
-- GNU binutils and linker
-- GNU Make
-- GRUB utilities and `grub-mkrescue`
-- xorriso
-- QEMU system emulator
-- GDB (for debugging)
-
-Exact build dependencies and commands will be maintained as the build system is finalized.
-
 ## Educational use
 
-Zero Kernel is an experimental learning project for exploring:
-
-- Operating-system architecture
-- x86_64 assembly and C
-- Bootloaders and CPU initialization
-- Memory management
-- Hardware drivers
-- Filesystem design
-- Executable formats and process management
-- Package management
+Zero Kernel is an experimental learning project for exploring operating-system architecture, x86_64 assembly and C, bootloaders, CPU initialization, memory management, hardware drivers, filesystem design, executable formats, process management, and package management.
 
 It is not intended for production use.
 
