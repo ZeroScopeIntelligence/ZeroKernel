@@ -182,7 +182,9 @@ def verify_package(package: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]
             for entry in manifest:
                 if not isinstance(entry, dict):
                     raise PackageError("Manifest entries must be objects.")
-                relative = safe_relative_path(entry.get("path", ""))
+                if not isinstance(entry.get("path"), str):
+                    raise PackageError("Manifest path must be a string.")
+                relative = safe_relative_path(entry["path"])
                 if relative in seen:
                     raise PackageError(f"Duplicate manifest path: {relative}")
                 seen.add(relative)
@@ -193,7 +195,7 @@ def verify_package(package: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]
                     r"[0-9a-f]{64}", entry["sha256"]
                 ):
                     raise PackageError(f"Invalid SHA-256 value for {relative}")
-                if not isinstance(entry.get("mode"), int) or entry["mode"] & ~0o755:
+                if not isinstance(entry.get("mode"), int) or entry["mode"] < 0 or entry["mode"] & ~0o755:
                     raise PackageError(f"Invalid file mode for {relative}")
 
                 member = f"payload/{relative}"
