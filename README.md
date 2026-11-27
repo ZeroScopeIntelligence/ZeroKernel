@@ -44,6 +44,12 @@ The initial kernel screen confirms that execution reached `kernel_main()` and wr
 │   ├── BOOTSTRAP.md
 │   ├── FILESYSTEM.md
 │   └── ZEROPKG.md
+├── examples/
+│   └── hello-package/
+├── tests/
+│   └── test_zeropkg.py
+├── tools/
+│   └── zeropkg.py
 ├── kernel/
 │   ├── arch/
 │   │   └── x86_64/
@@ -189,11 +195,18 @@ ZeroPKG is the proposed native package manager. Its intended command interface i
 | `zeropkg list` | List installed packages |
 | `zeropkg info <name>` | Show package information |
 
-These commands are a design target, not currently working shell commands. The proposed `.zpkg` format will include package metadata, a file manifest, and payload files. Package integrity and repository authenticity checks are required before installation is enabled.
+The host-side ZeroPKG prototype is now implemented in Python. It can create, inspect, and verify version-1 `.zpkg` archives. It checks payload paths, file sizes, SHA-256 digests, archive structure, and basic extraction-safety constraints. It does not install packages into the host or the running kernel.
 
-A full package manager depends on persistent storage, a VFS, an ELF64 loader, user-mode execution, process management, and system calls. Remote repositories will additionally require networking and TLS.
+Try the current host-side commands:
 
-See [ZeroPKG Design](docs/ZEROPKG.md) for the proposed package format, trust model, and implementation milestones.
+```bash
+python3 tools/zeropkg.py --help
+python3 -m unittest discover -s tests -v
+```
+
+The native commands above remain a future design target. Native installation depends on persistent storage, a VFS, an ELF64 loader, user-mode execution, process management, and system calls. Signed repository metadata and TLS-backed remote repositories are also future work.
+
+See [ZeroPKG Design](docs/ZEROPKG.md) for the package format, current tool usage, trust model, and implementation milestones.
 
 ## Development roadmap
 
@@ -205,8 +218,9 @@ See [ZeroPKG Design](docs/ZEROPKG.md) for the proposed package format, trust mod
 6. Add a block-device abstraction and QEMU storage driver.
 7. Connect filesystem operations to the shell.
 8. Implement an ELF64 loader, user mode, processes, and system calls.
-9. Build ZeroPKG and local package installation.
-10. Add package repositories, signature verification, and network support.
+9. Expand ZeroPKG package-format tests and implement offline installation into a disposable test root.
+10. Add transactional removal, package database, and dependency resolution.
+11. Add signed repository metadata and network support after TLS is available.
 11. Evaluate ext2 compatibility and additional device drivers.
 
 ## Development principles
