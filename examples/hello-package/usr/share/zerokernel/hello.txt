@@ -1,0 +1,4 @@
+Zero Kernel package-format demonstration payload.
+
+This file is sample data for testing the host-side ZeroPKG archive builder.
+It is not an executable and is not installed by the current prototype.
