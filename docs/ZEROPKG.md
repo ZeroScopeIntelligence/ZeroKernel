@@ -1,111 +1,104 @@
-# ZeroPKG Package Manager Design
+# ZeroPKG Package Manager
 
-**Status:** Proposed architecture — not yet implemented.
+**Status:** Host-side package creation and verification prototype implemented. Native installation is not implemented.
 
-ZeroPKG is the planned native package manager for Zero Kernel. It will manage software packages after the operating system has the filesystem, executable loader, process model, and required system services.
+ZeroPKG is the planned native package manager for Zero Kernel. The first implementation is a host-side Python utility used to create, inspect, and verify .zpkg archives while the operating system's filesystem and process services are still under development.
 
-## Goals
+## Current host-side commands
 
-- Install, remove, inspect, and list packages.
-- Track package versions and file ownership.
-- Resolve declared dependencies.
-- Verify package integrity and repository metadata.
-- Keep installation and removal predictable and auditable.
+Run the utility from the repository root:
 
-## Planned commands
+```bash
+python3 tools/zeropkg.py --help
+```
 
-| Command | Purpose |
-|---|---|
-| `zeropkg update` | Refresh repository metadata |
-| `zeropkg upgrade` | Upgrade installed packages |
-| `zeropkg install <name>` | Install a package |
-| `zeropkg remove <name>` | Remove a package |
-| `zeropkg search <term>` | Search repository metadata |
-| `zeropkg list` | List installed packages |
-| `zeropkg info <name>` | Display package metadata |
-| `zeropkg verify` | Verify installed package files |
+Create a package from a directory tree:
 
-These commands describe the intended interface; they are not available in the current kernel.
+```bash
+python3 tools/zeropkg.py create \
+  --name hello \
+  --version 1.0.0 \
+  --source examples/hello-package \
+  --output build/hello-1.0.0.zpkg \
+  --architecture x86_64 \
+  --description "Example Zero Kernel utility" \
+  --license MIT
+```
 
-## Proposed .zpkg package format
+Inspect package metadata and verify its contents:
 
-The first format may be a versioned archive containing:
+```bash
+python3 tools/zeropkg.py inspect build/hello-1.0.0.zpkg
+python3 tools/zeropkg.py verify build/hello-1.0.0.zpkg
+```
+
+Dependencies can be declared by repeating --depends:
+
+```bash
+python3 tools/zeropkg.py create \
+  --name demo-app --version 1.0.0 \
+  --source examples/demo-app \
+  --output build/demo-app-1.0.0.zpkg \
+  --depends runtime-lib --depends base-utils
+```
+
+## Package format v1
+
+A .zpkg file is a ZIP archive with the following entries:
 
 ```text
 example-1.0.0.zpkg
 ├── metadata.json
-├── manifest.txt
+├── manifest.json
 └── payload/
     └── usr/
         └── bin/
             └── example
 ```
 
-Example metadata:
+metadata.json records the format version, package name, version, architecture (x86_64 or any), description, dependencies, and license.
 
-```json
-{
-  "format_version": 1,
-  "name": "example",
-  "version": "1.0.0",
-  "architecture": "x86_64",
-  "description": "Example Zero Kernel utility",
-  "dependencies": [],
-  "license": "MIT"
-}
+manifest.json records each payload file's normalized relative path, byte size, SHA-256 digest, and intended permission bits.
+
+## Verification and safety behavior
+
+The prototype currently:
+
+- Rejects symbolic links and non-regular source files when creating packages.
+- Rejects absolute paths, parent-directory traversal, backslashes, and non-normalized paths.
+- Rejects duplicate archive and manifest entries.
+- Rejects symlink entries, encrypted entries, and unsupported compression methods.
+- Enforces file-count, per-file, and total uncompressed size limits.
+- Checks that archive payload paths match the manifest.
+- Verifies every payload file's size and SHA-256 digest.
+- Does not extract archives or execute package scripts.
+
+The SHA-256 manifest detects payload changes only when the manifest itself is trusted. It does **not** authenticate the publisher. Signed package metadata and trusted repository keys are future requirements before packages can be accepted from remote sources.
+
+## Tests
+
+Run the unit tests:
+
+```bash
+python3 -m unittest discover -s tests -v
 ```
 
-The package format must define archive limits, path normalization, file permissions, checksums, and signature handling before installation is implemented.
+The tests cover package creation, checksum tampering, symbolic-link rejection, and path-traversal rejection.
 
-## Repository and trust model
+## Not implemented yet
 
-Repository metadata and packages must be authenticated. The design should include:
+The current utility does not install or remove software, resolve dependencies, maintain an installed-package database, download packages, verify digital signatures, or interact with the running Zero Kernel. It is a host-side format prototype only.
 
-- Signed repository metadata.
-- Package hashes checked before installation.
-- A documented trusted-key mechanism.
-- Version and architecture checks.
-- Clear failure behavior when signatures or hashes do not match.
-- No automatic execution of arbitrary package install scripts.
+Native installation must wait until Zero Kernel has persistent storage, a VFS, safe file operations, an ELF64 loader, user-mode execution, process management, and a system-call interface.
 
-Packages should install files only beneath approved system directories. Path traversal, absolute-path injection, symlink escape, and archive extraction attacks must be prevented.
+## Planned milestones
 
-## Installed package database
+1. Finalize the metadata and archive specification.
+2. Expand tests for malformed archives, limits, permissions, and duplicate paths.
+3. Add package database and dependency-resolution design.
+4. Implement offline installation into a disposable test root filesystem.
+5. Add transactional install/remove and file ownership tracking.
+6. Add signed repository metadata and a trusted-key model.
+7. Add remote repository support after networking and TLS exist.
 
-The planned database location is:
-
-```text
-/var/lib/zeropkg/
-├── installed/
-│   └── example.json
-└── status.db
-```
-
-The package database should record package name, version, architecture, installed file manifest, checksums, and dependencies.
-
-## Required kernel capabilities
-
-ZeroPKG should not be treated as a working installer until these capabilities exist:
-
-1. Persistent filesystem and VFS.
-2. Storage driver and reliable file writes.
-3. ELF64 executable loader.
-4. User-mode execution and process management.
-5. System-call interface for file and process operations.
-6. Networking and TLS support for remote repositories, or a safe offline package import path.
-7. Package verification and installation transaction logic.
-
-## Development milestones
-
-1. Finalize and document the package metadata schema.
-2. Build a host-side `.zpkg` creation and inspection tool.
-3. Implement package manifest and checksum verification.
-4. Implement local/offline package installation to a test root filesystem.
-5. Add installed-package database and removal logic.
-6. Add dependency resolution.
-7. Add signed repository metadata.
-8. Add network repository support after networking and TLS are available.
-
-## Scope
-
-ZeroPKG is intended to be independent of Linux package managers. Familiar command names are user-interface inspiration only; ZeroPKG will use its own package format, metadata, repository format, and installation implementation.
+ZeroPKG is independent of Linux package managers; familiar command names are interface inspiration only.
