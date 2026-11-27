@@ -1,0 +1,15 @@
+# Build output
+build/
+iso/boot/
+
+# Locally built cross-compiler
+.toolchain/
+
+# Compiled objects and binaries
+*.o
+*.elf
+*.iso
+
+# Editor and temporary files
+*~
+*.swp
