@@ -30,3 +30,14 @@ The initial page tables currently map only the first 2 MiB of physical memory. S
 6. Develop process management, system calls, and user-mode execution.
 
 See [README.md](README.md) and [docs/BOOTSTRAP.md](docs/BOOTSTRAP.md) for build instructions and technical details.
+
+
+## Started: ZeroPKG host-side tooling
+
+- Added `tools/zeropkg.py` to create, inspect, and verify version-1 .zpkg archives.
+- Defined package metadata and a per-file manifest with SHA-256 checksums and permission bits.
+- Added validation for unsafe paths, symbolic links, duplicate entries, unsupported compression, and archive size limits.
+- Added unit tests for package creation, payload tampering, symbolic-link rejection, and path traversal.
+- Updated the ZeroPKG design document and README.
+
+**Important:** This is a host-side package-format prototype. It does not install software into the host or the running kernel. Native installation remains blocked on the VFS, persistent storage, executable loader, process model, and system-call interface.
