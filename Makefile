@@ -28,7 +28,7 @@ C_SOURCES = kernel/core/kernel.c
 ASM_SOURCES = kernel/arch/x86_64/boot.asm
 OBJECTS = $(BUILD)/boot.o $(BUILD)/kernel.o
 
-.PHONY: all iso run check clean
+.PHONY: all iso run check zpkg-test clean
 
 all: $(BUILD)/kernel.elf
 
@@ -56,6 +56,9 @@ iso: check
 
 run: iso
 	qemu-system-x86_64 -cdrom $(BUILD)/zerokernel.iso -m 256M
+
+zpkg-test:
+	python3 -m unittest discover -s tests -v
 
 clean:
 	rm -rf $(BUILD) iso/boot
